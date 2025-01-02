@@ -7,14 +7,15 @@ const Person = ({ person }) => {
 };
 
 const Persons = ({ personsToShow }) => {
-  return (
-    <>
-      {" "}
-      {personsToShow.map((person) => (
+  const isArrayEmpty = personsToShow.length === 0;
+
+  const contentToShow = isArrayEmpty
+    ? ""
+    : personsToShow.map((person) => (
         <Person key={person.name} person={person} />
-      ))}
-    </>
-  );
+      ));
+
+  return <>{contentToShow}</>;
 };
 
 export default Persons;
