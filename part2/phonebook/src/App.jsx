@@ -1,5 +1,7 @@
 import { useState, useEffect } from "react";
-import axios from "axios";
+
+import comparator from "./utils/comparator";
+import crudService from "./services/crudService";
 
 import Filter from "./Filter";
 import PersonForm from "./PersonForm";
@@ -12,74 +14,60 @@ const App = () => {
   const [nameFilter, setNameFilter] = useState("");
 
   useEffect(() => {
-    axios.get("http://localhost:3001/persons").then((response) => {
-      setPersons(response.data);
+    crudService.getAll().then((personsList) => {
+      setPersons(personsList);
     });
   }, []);
-
-  const areElementsEqual = (element1, element2) => element1 === element2;
-
-  const areNotObjectOrNull = (element1, element2) => {
-    const condition =
-      typeof element1 !== "object" &&
-      element1 === null &&
-      typeof element2 !== "object" &&
-      element2 === null;
-
-    return condition ? true : false;
-  };
-
-  const areKeysSameLength = (element1, element2) => {
-    const keys1 = Object.keys(element1);
-    const keys2 = Object.keys(element2);
-
-    return keys1.length === keys2.length;
-  };
-
-  const deepEqual = (element1, element2) => {
-    if (areElementsEqual(element1, element2)) {
-      console.log("Elements are equal");
-      return true;
-    }
-
-    if (areNotObjectOrNull(element1, element2)) {
-      console.log("Not an object or null");
-      return false;
-    }
-
-    if (!areKeysSameLength(element1, element2)) {
-      console.log("Keys not same length");
-      return false;
-    }
-
-    const keys1 = Object.keys(element1);
-
-    for (let key of keys1) {
-      if (
-        !element2.hasOwnProperty(key) ||
-        !deepEqual(element1[key], element2[key])
-      ) {
-        return false;
-      }
-    }
-
-    return true;
-  };
 
   const handleSubmit = (event) => {
     event.preventDefault();
 
-    const newPerson = { name: newName, number: newNumber };
+    let newPerson = { name: newName, number: newNumber };
 
-    const isNewPerson = persons.every(
-      (person) => !deepEqual(person, newPerson)
-    );
+    const personsToCompare = persons.map((person) => {
+      return {
+        name: person.name,
+        number: person.number,
+      };
+    });
 
-    if (!isNewPerson) {
-      alert(`${newName} is already added to phonebook`);
-    } else {
-      setPersons(persons.concat(newPerson));
+    let isNewPerson = true;
+
+    for (const person of personsToCompare) {
+      if (comparator.areDeepEqual(person, newPerson)) {
+        isNewPerson = false;
+        break;
+      }
     }
+
+    if (isNewPerson) {
+      crudService.create(newPerson).then((createdPerson) => {
+        setPersons(persons.concat(createdPerson));
+      });
+    } else {
+      if (
+        confirm(
+          `${newPerson.name} is already added to phonebook, replace the old number with a new one?`
+        )
+      ) {
+        const personId = persons.find(
+          (person) => person.name === newPerson.name
+        ).id;
+
+        newPerson = { ...newPerson, id: personId };
+
+        crudService.updateById(personId, newPerson).then((updatedPerson) => {
+          setPersons(
+            persons.map((person) =>
+              person.id === updatedPerson.id ? newPerson : person
+            )
+          );
+        });
+      } else {
+        alert(`Number change canceled`);
+      }
+    }
+
     setNewName("");
     setNewNumber("");
   };
@@ -94,6 +82,16 @@ const App = () => {
 
   const handleNumberChange = (event) => {
     setNewNumber(event.target.value);
+  };
+
+  const handleDelete = ({ id, name }) => {
+    if (confirm(`Delete ${name}?`)) {
+      crudService.deleteById(id).then((deletedPerson) => {
+        setPersons(persons.filter((person) => person.id !== deletedPerson.id));
+      });
+    } else {
+      alert(`Deletion canceled`);
+    }
   };
 
   const personsToShow =
@@ -119,7 +117,7 @@ const App = () => {
         handleSubmit={handleSubmit}
       />
       <h3>Numbers</h3>
-      <Persons personsToShow={personsToShow} />
+      <Persons personsToShow={personsToShow} handleDelete={handleDelete} />
     </div>
   );
 };
