@@ -1,17 +1,21 @@
 import { useState, useEffect } from "react";
 
-import comparator from "./utils/comparator";
 import crudService from "./services/crudService";
 
 import Filter from "./Filter";
 import PersonForm from "./PersonForm";
 import Persons from "./Persons";
+import Notification from "./Notification";
 
 const App = () => {
   const [persons, setPersons] = useState([]);
   const [newName, setNewName] = useState("");
   const [newNumber, setNewNumber] = useState("");
   const [nameFilter, setNameFilter] = useState("");
+  const [notification, setNotification] = useState({
+    message: null,
+    isSuccess: true,
+  });
 
   useEffect(() => {
     crudService.getAll().then((personsList) => {
@@ -24,25 +28,12 @@ const App = () => {
 
     let newPerson = { name: newName, number: newNumber };
 
-    const personsToCompare = persons.map((person) => {
-      return {
-        name: person.name,
-        number: person.number,
-      };
-    });
-
-    let isNewPerson = true;
-
-    for (const person of personsToCompare) {
-      if (comparator.areDeepEqual(person, newPerson)) {
-        isNewPerson = false;
-        break;
-      }
-    }
+    const isNewPerson = isNewRegistration(newPerson);
 
     if (isNewPerson) {
       crudService.create(newPerson).then((createdPerson) => {
         setPersons(persons.concat(createdPerson));
+        triggerNotification(`Added ${createdPerson.name}`, true);
       });
     } else {
       if (
@@ -54,15 +45,24 @@ const App = () => {
           (person) => person.name === newPerson.name
         ).id;
 
-        newPerson = { ...newPerson, id: personId };
+        const personToUpdate = { ...newPerson, id: personId };
 
-        crudService.updateById(personId, newPerson).then((updatedPerson) => {
-          setPersons(
-            persons.map((person) =>
-              person.id === updatedPerson.id ? newPerson : person
-            )
-          );
-        });
+        crudService
+          .updateById(personId, personToUpdate)
+          .then((updatedPerson) => {
+            setPersons(
+              persons.map((person) =>
+                person.id === updatedPerson.id ? updatedPerson : person
+              )
+            );
+            triggerNotification(`Updated ${updatedPerson.name}`, true);
+          })
+          .catch((error) => {
+            triggerNotification(
+              `Information of ${personToUpdate.name} has already been removed from server`,
+              false
+            );
+          });
       } else {
         alert(`Number change canceled`);
       }
@@ -70,6 +70,25 @@ const App = () => {
 
     setNewName("");
     setNewNumber("");
+  };
+
+  const isNewRegistration = (lookupPerson) => {
+    const personAlreadyRegistered = persons.find(
+      (person) => person.name === lookupPerson.name
+    );
+
+    const isNewRegistration = personAlreadyRegistered === undefined;
+
+    return isNewRegistration;
+  };
+
+  const triggerNotification = (name, isSuccess) => {
+    const notification = { message: name, isSuccess: isSuccess };
+
+    setNotification(notification);
+    setTimeout(() => {
+      setNotification({ message: null, isSuccess: true });
+    }, 5000);
   };
 
   const handleNameFilterChange = (event) => {
@@ -104,6 +123,7 @@ const App = () => {
   return (
     <div>
       <h2>Phonebook</h2>
+      <Notification notification={notification} />
       <Filter
         nameFilter={nameFilter}
         handleNameFilterChange={handleNameFilterChange}
