@@ -1,8 +1,10 @@
+require("dotenv").config();
 const express = require("express");
 const morgan = require("morgan");
 const cors = require("cors");
 
 const app = express();
+const Person = require("./models/person");
 
 app.use(express.json());
 app.use(cors());
@@ -15,29 +17,6 @@ const bodyTokenMiddleware = (request, response, next) => {
 };
 
 app.use(bodyTokenMiddleware);
-
-let persons = [
-  {
-    id: "1",
-    name: "Arto Hellas",
-    number: "040-123456",
-  },
-  {
-    id: "2",
-    name: "Ada Lovelace",
-    number: "39-44-5323523",
-  },
-  {
-    id: "3",
-    name: "Dan Abramov",
-    number: "12-43-234345",
-  },
-  {
-    id: "4",
-    name: "Mary Poppendieck",
-    number: "39-23-6423122",
-  },
-];
 
 app.get("/info", (request, response) => {
   const personsLength = persons.length;
@@ -52,67 +31,64 @@ app.get("/info", (request, response) => {
 });
 
 app.get("/api/persons", (request, response) => {
-  response.json(persons);
+  Person.find({}).then((persons) => {
+    response.json(persons);
+  });
 });
 
-const generateId = () => {
-  const maxValue = 1000;
-  return Math.floor(Math.random() * maxValue);
-};
-
 app.post("/api/persons", (request, response) => {
-  const body = request.body;
+  const personName = request.body.name;
+  const personNumber = request.body.number;
 
-  if (!body.name || !body.number) {
+  if (!personName || !personNumber) {
     return response.status(400).json({
       error: "content missing",
     });
   }
 
-  const isPersonRegistered = persons.find((person) => person.name === body.name)
-    ? true
-    : false;
+  const person = new Person({
+    name: personName,
+    number: personNumber,
+  });
 
-  if (isPersonRegistered) {
-    return response.status(400).json({
-      error: "name must be unique",
-    });
-  }
-
-  const person = {
-    id: generateId().toString(),
-    name: body.name,
-    number: body.number,
-  };
-
-  persons = persons.concat(person);
-  response.status(201).json(person);
+  person.save().then((savedPerson) => {
+    console.log(
+      `added ${savedPerson.name} number ${savedPerson.number} to phonebook`
+    );
+    response.status(201).json(person);
+  });
 });
 
-app.get("/api/persons/:id", (request, response) => {
+app.put("/api/persons/:id", (request, response) => {
   const id = request.params.id;
-  const person = persons.find((person) => person.id === id);
+  const personNewNumber = request.body.number;
 
-  if (person) {
-    response.json(person);
-  } else {
-    response.status(404).end();
-  }
+  Person.findOneAndUpdate(
+    { _id: id },
+    { $set: { number: personNewNumber } },
+    { returnDocument: "after" }
+  ).then((updatedPerson) => {
+    if (updatedPerson) {
+      response.json(updatedPerson);
+    } else {
+      response.status(404).end();
+    }
+  });
 });
 
 app.delete("/api/persons/:id", (request, response) => {
   const id = request.params.id;
-  const person = persons.find((person) => person.id === id);
 
-  if (person) {
-    persons = persons.filter((person) => person.id !== id);
-    response.status(204).end();
-  } else {
-    response.status(404).end();
-  }
+  Person.deleteOne({ _id: id }).then(({ acknowledged }) => {
+    if (acknowledged) {
+      response.status(204).end();
+    } else {
+      response.status(404).end();
+    }
+  });
 });
 
-const PORT = process.env.PORT || 3001;
+const PORT = process.env.PORT;
 app.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
 });
