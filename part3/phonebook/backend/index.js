@@ -9,14 +9,13 @@ const Person = require("./models/person");
 app.use(express.json());
 app.use(cors());
 app.use(express.static("dist"));
-app.use(morgan(":method :url :body"));
 
 const bodyTokenMiddleware = (request, response, next) => {
   morgan.token("body", (request) => JSON.stringify(request.body));
   next();
 };
-
 app.use(bodyTokenMiddleware);
+app.use(morgan(":method :url :body"));
 
 app.get("/info", (request, response) => {
   const personsLength = persons.length;
@@ -34,6 +33,16 @@ app.get("/api/persons", (request, response) => {
   Person.find({}).then((persons) => {
     response.json(persons);
   });
+});
+
+app.get("/api/persons/:id", (request, response, next) => {
+  const id = request.params.id;
+
+  Person.find({ _id: id })
+    .then((person) => {
+      response.json(person);
+    })
+    .catch((error) => next(error));
 });
 
 app.post("/api/persons", (request, response) => {
@@ -59,7 +68,7 @@ app.post("/api/persons", (request, response) => {
   });
 });
 
-app.put("/api/persons/:id", (request, response) => {
+app.put("/api/persons/:id", (request, response, next) => {
   const id = request.params.id;
   const personNewNumber = request.body.number;
 
@@ -67,26 +76,42 @@ app.put("/api/persons/:id", (request, response) => {
     { _id: id },
     { $set: { number: personNewNumber } },
     { returnDocument: "after" }
-  ).then((updatedPerson) => {
-    if (updatedPerson) {
-      response.json(updatedPerson);
-    } else {
-      response.status(404).end();
-    }
-  });
+  )
+    .then((updatedPerson) => {
+      if (updatedPerson) {
+        response.json(updatedPerson);
+      } else {
+        response.status(404).end();
+      }
+    })
+    .catch((error) => next(error));
 });
 
-app.delete("/api/persons/:id", (request, response) => {
+app.delete("/api/persons/:id", (request, response, next) => {
   const id = request.params.id;
 
-  Person.deleteOne({ _id: id }).then(({ acknowledged }) => {
-    if (acknowledged) {
-      response.status(204).end();
-    } else {
-      response.status(404).end();
-    }
-  });
+  Person.deleteOne({ _id: id })
+    .then(({ acknowledged }) => {
+      if (acknowledged) {
+        response.status(204).end();
+      } else {
+        response.status(404).end();
+      }
+    })
+    .catch((error) => next(error));
 });
+
+const errorHandler = (error, request, response, next) => {
+  console.log(error.message);
+
+  if (error.name === "CastError") {
+    return response.status(400).send({ error: "malformattted id" });
+  }
+
+  next(error);
+};
+
+app.use(errorHandler);
 
 const PORT = process.env.PORT;
 app.listen(PORT, () => {
