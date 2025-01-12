@@ -17,7 +17,7 @@ const PersonForm = ({
           id="number"
           type="tel"
           value={newNumber}
-          pattern="[0-9]{3}-[0-9]{6}"
+          // pattern="[0-9]{3}-[0-9]{6}"
           onChange={handleNumberChange}
           required
         />

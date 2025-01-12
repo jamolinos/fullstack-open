@@ -31,10 +31,15 @@ const App = () => {
     const isNewPerson = isNewRegistration(newPerson);
 
     if (isNewPerson) {
-      crudService.create(newPerson).then((createdPerson) => {
-        setPersons(persons.concat(createdPerson));
-        triggerNotification(`Added ${createdPerson.name}`, true);
-      });
+      crudService
+        .create(newPerson)
+        .then((createdPerson) => {
+          setPersons(persons.concat(createdPerson));
+          triggerNotification(`Added ${createdPerson.name}`, true);
+        })
+        .catch((error) => {
+          triggerErrorMessage(error);
+        });
     } else {
       if (
         confirm(
@@ -58,10 +63,8 @@ const App = () => {
             triggerNotification(`Updated ${updatedPerson.name}`, true);
           })
           .catch((error) => {
-            triggerNotification(
-              `Information of ${personToUpdate.name} has already been removed from server`,
-              false
-            );
+            const errorMessage = error.response.data.error;
+            triggerNotification(errorMessage, false);
           });
       } else {
         alert(`Number change canceled`);
@@ -82,8 +85,13 @@ const App = () => {
     return isNewRegistration;
   };
 
-  const triggerNotification = (name, isSuccess) => {
-    const notification = { message: name, isSuccess: isSuccess };
+  const triggerErrorMessage = (error) => {
+    const errorMessage = error.response.data.error;
+    triggerNotification(errorMessage, false);
+  };
+
+  const triggerNotification = (notificationMessage, isSuccess) => {
+    const notification = { message: notificationMessage, isSuccess: isSuccess };
 
     setNotification(notification);
     setTimeout(() => {
